@@ -189,13 +189,13 @@ def get_action(obs):
     global phase, visited, destination_visited
     # Load the trained policies
     try:
-        with open('q_pickup_leaderboard.pkl', 'rb') as f:
+        with open('q_pickup.pkl', 'rb') as f:
             pickup_policy = pickle.load(f)
     except FileNotFoundError:
         print('Pickup policy not found!!')
         return random.choice([0, 1, 2, 3, 4, 5])
     try:
-        with open('q_dropoff_leaderboard.pkl', 'rb') as f:
+        with open('q_dropoff.pkl', 'rb') as f:
             dropoff_policy = pickle.load(f)
     except FileNotFoundError:
         print('Dropoff policy not found!!')
