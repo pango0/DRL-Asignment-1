@@ -138,48 +138,107 @@ visited = [0, 0, 0, 0]
 destination_visited = [0, 0, 0, 0]
 phase = 'pickup'
 
+# def get_action(obs):
+#     # Load the trained Q-table
+#     global phase, visited, destination_visited
+#     try:
+#         with open('q_pickup_best.pkl', 'rb') as f:
+#             pickup_table = pickle.load(f)
+#     except FileNotFoundError:
+#         print('pickup table not found!!')
+#         return random.choice([0, 1, 2, 3, 4, 5])
+#     try:
+#         with open('q_dropoff_best.pkl', 'rb') as f:
+#             dropoff_table = pickle.load(f)
+#     except FileNotFoundError:
+#         print('dropoff table not found!!')
+#         return random.choice([0, 1, 2, 3, 4, 5])
+#     print(phase)
+#     if phase == 'pickup':
+#         state = get_pickup_state(visited, obs)
+#         stations = [(obs[i], obs[i + 1]) for i in range(2, 10, 2)]
+#         for station in stations:
+#             if np.array_equal((obs[0], obs[1]), station):
+#                 visited[stations.index(station)] = True
+#         q_table = pickup_table
+#     else:
+#         state = get_dropoff_state(destination_visited, obs)
+#         stations = [(obs[i], obs[i + 1]) for i in range(2, 10, 2)]
+#         for station in stations:
+#             if np.array_equal((obs[0], obs[1]), station):
+#                 destination_visited[stations.index(station)] = True
+#         q_table = dropoff_table
+#         # q_table = pickup_table
+#     # Choose the best action based on Q-table
+#     print(state)
+#     if state in q_table:
+#         action = np.argmax(q_table[state])
+#         obs_arr = np.array(obs)
+            
+#         if action == 4 and obs[14]:
+#             if any(np.array_equal((obs_arr[0], obs_arr[1]), station) for station in stations):
+#                 print('Switch phase')
+#                 phase = 'dropoff'
+#         return action
+#     else:
+#         # If state not found in Q-table, return a random action
+#         print('state not found')
+#         return random.choice([0, 1, 2, 3, 4, 5])
+
 def get_action(obs):
-    # Load the trained Q-table
     global phase, visited, destination_visited
+    # Load the trained policies
     try:
-        with open('q_pickup.pkl', 'rb') as f:
-            pickup_table = pickle.load(f)
+        with open('q_pickup_leaderboard.pkl', 'rb') as f:
+            pickup_policy = pickle.load(f)
     except FileNotFoundError:
-        print('pickup table not found!!')
+        print('Pickup policy not found!!')
         return random.choice([0, 1, 2, 3, 4, 5])
     try:
-        with open('q_dropoff.pkl', 'rb') as f:
-            dropoff_table = pickle.load(f)
+        with open('q_dropoff_leaderboard.pkl', 'rb') as f:
+            dropoff_policy = pickle.load(f)
     except FileNotFoundError:
-        print('dropoff table not found!!')
+        print('Dropoff policy not found!!')
         return random.choice([0, 1, 2, 3, 4, 5])
-    print(phase)
+
+    # Get current phase state
     if phase == 'pickup':
         state = get_pickup_state(visited, obs)
-        stations = [(obs[i], obs[i + 1]) for i in range(2, 10, 2)]
+        policy_logits = pickup_policy
+        # Update visited stations
+        stations = [(obs[i], obs[i+1]) for i in range(2, 10, 2)]
         for station in stations:
             if np.array_equal((obs[0], obs[1]), station):
-                visited[stations.index(station)] = True
-        q_table = pickup_table
+                visited[stations.index(station)] = 1
     else:
         state = get_dropoff_state(destination_visited, obs)
-        stations = [(obs[i], obs[i + 1]) for i in range(2, 10, 2)]
+        policy_logits = dropoff_policy
+        # Update destination visited
+        stations = [(obs[i], obs[i+1]) for i in range(2, 10, 2)]
         for station in stations:
             if np.array_equal((obs[0], obs[1]), station):
-                destination_visited[stations.index(station)] = True
-        q_table = dropoff_table
-        # q_table = pickup_table
-    # Choose the best action based on Q-table
-    if state in q_table:
-        action = np.argmax(q_table[state])
-        obs_arr = np.array(obs)
-            
-        if action == 4 and obs[14]:
-            if any(np.array_equal((obs_arr[0], obs_arr[1]), station) for station in stations):
-                print('Switch phase')
-                phase = 'dropoff'
-        return action
-    else:
-        # If state not found in Q-table, return a random action
-        print('state not found')
+                destination_visited[stations.index(station)] = 1
+
+    # Get action probabilities using softmax
+    if state not in policy_logits:
+        # If state unknown, use uniform random policy
         return random.choice([0, 1, 2, 3, 4, 5])
+    
+    logits = policy_logits[state]
+    # Numerically stable softmax
+    max_logit = np.max(logits)
+    exp_logits = np.exp(logits - max_logit)
+    probs = exp_logits / np.sum(exp_logits)
+    
+    # Sample action from probability distribution
+    action = np.random.choice(6, p=probs)
+
+    # Handle phase transition (same as original logic)
+    obs_arr = np.array(obs)
+    stations = [(obs[i], obs[i+1]) for i in range(2, 10, 2)]
+    if action == 4 and obs[14]:  # If pickup action and passenger present
+        if any(np.array_equal((obs_arr[0], obs_arr[1]), station) for station in stations):
+            print('Switch phase to dropoff')
+            phase = 'dropoff'
+
+    return action
