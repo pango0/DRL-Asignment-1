@@ -2,7 +2,6 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from torch.distributions import Categorical
-from hsuan import SimpleTaxiEnv  # Make sure this import works
 
 # Global variables to maintain state across calls
 policy_net = None
